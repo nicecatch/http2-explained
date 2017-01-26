@@ -1,0 +1,16 @@
+# English Summary
+
+* [Background](part1.md)
+* [HTTP Oggi](part2.md)
+* [Cosa è stato fatto per i problemi di latenza](part3.md)
+* [Aggiornare HTTP](part4.md)
+* [Concetti http2](part5.md)
+* [Il protocollo http2](part6.md)
+* [Estensioni](part7.md)
+* [Il mondo http2](part8.md)
+* [http2 in Firefox](part9.md)
+* [http2 in Chromium](part10.md)
+* [http2 in curl](part11.md)
+* [Dopo http2](part12.md)
+* [Letture aggiuntive](part13.md)
+* [Ringraziamenti](part14.md)
