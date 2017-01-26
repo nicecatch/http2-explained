@@ -1,6 +1,6 @@
 # 5. Concetti http2
 
-Quindi, http2 cosa è capace di realizzare? Quali sono i limiti imposti per il gruppo HTTPbis?
+Cosa è capace di realizzare http2? Quali sono i limiti imposti per il gruppo HTTPbis?
 
 I limiti erano in effetti alquanto restrittivi e hanno messo diversi paletti all'abilità di innovazione del team.
 
