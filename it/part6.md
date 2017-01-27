@@ -14,82 +14,75 @@ Inoltre viene molto più facile separare alcune sezioni di protocollo dal framin
 
 Inoltre il fatto che il protocllo utilizzi la compressione e verrà spesso utilizzato tramite TLS diminuisce il valore del testo, dato che non sarebbe comunque possibile vedere del testo sul cavo di trasmissione. Dobbiamo semplicemente abituarci all'idea di usare strumenti come Wireshark per ispezionare cosa sta succedendo a livello protocollo.
 
-Il 'debugging' di questo protocollo verrà probabilmente fatto con strumenti come curl, o analizzando il flusso di rete con il dissettore http2 di Wireshark o simili.
+Il 'debugging' di questo protocollo potrà essere fatto con strumenti come curl, o analizzando il flusso di rete con il dissettore http2 di Wireshark e simili.
 
 ## 6.2. Il formato binario
 
 <img style="float: right;" src="https://raw.githubusercontent.com/bagder/http2-explained/master/images/frame-layout.png" />
 
-http2 sends binary frames. There are different frame types that can be sent and they all have the same setup: Length, Type, Flags, Stream Identifier, and frame payload.
+http2 invia frame binari. Esistono differenti tipi di frame che possono essere inviati e hanno tutti lo stesso formato: Lunghezza, Tipo, Flags, Identificatore Flusso (Stream ID) e contenuto (payload).
 
-There are ten different frame types defined in the http2 spec and perhaps the two most fundamental ones that map to HTTP 1.1 features are DATA and HEADERS. I'll describe some of the frames in more detail further on.
+Esistono dieci diffenti tipi di frame definiti nella specifica http2 e probabilmente i due più importanti sono i frame che hanno una relazione 1:1 con HTTP 1.1 : DATA (contenuto) e HEADERS (instestazioni). Descrvierò in dettaglio alcui di questi frame più avanti
 
-## 6.3. Multiplexed streams
+## 6.3. Flussi mescolati ('multiplexed streams')
 
-The Stream Identifier mentioned in the previous section associates each frame sent over http2 with a “stream”. A stream is an independent, bi-directional sequence of frames exchanged between the client and server within an http2 connection.
+L'identificatore di stream sopra descritto associa ogni frame inviato tramite http2 con un "flusso". Per flusso si intende una sequesnza di frame indipendente e bi-direzinale scambiata tra il client e il server tramite una connessione http2.
 
-A single http2 connection can contain multiple concurrently-open streams, with either endpoint interleaving frames from multiple streams. Streams can be established and used unilaterally or shared by either the client or server and they can be closed by either endpoint. The order in which frames are sent within a stream is significant. Recipients process frames in the order they are received.
+Una singola connessione http2 può contenere più flussi aperti concorrenti, con ogni estremità che permette l'interlacciamento di flussi diversi. I flussi possono essere stabiliti e usati unilateralmente o condivisi sia dal client che dal server e possono essere chiusi da qualunque degli endpoint. L'ordine con cui questi frame sono presentati all'interno del flusso è importante. Il mittente infatti elabora i frame nell'ordiine con cui li riceve.
 
-Multiplexing the streams means that packages from many streams are mixed over the same connection. Two (or more) individual trains of data are made into a single one and then split up again on the other side. Here are two trains:
+Mescolare (multiplexare) il flusso significa che i pacchetti da stream differrenti sono introdotti nella stessa connessione. Due (o più) treni individuali di informazioni sono composti in uno singolo e suddivisi nuovamente una volta raggiunta la destizione. Qui i due treni:
 
 ![one train](https://raw.githubusercontent.com/bagder/http2-explained/master/images/train-justin.jpg)
 ![another train](https://raw.githubusercontent.com/bagder/http2-explained/master/images/train-ikea.jpg)
 
-The two trains multiplexed over the same connection:
+I due treni mescolati nella stessa connessione:
 
 ![multiplexed train](https://raw.githubusercontent.com/bagder/http2-explained/master/images/train-multiplexed.jpg)
 
-## 6.4. Priorities and dependencies
+## 6.4. Priorità e dipendenze
 
-Each stream also has a priority (also known as “weight”), which is used to tell the peer which streams to consider most important, in case there are resource restraints that force the server to select which streams to send first.
+Ogni flusso ha una priorità (anche chiamata "peso"), che è usata per indicare all'altra estremità quale flusso è da considerare più importante in caso siano presenti limitazioni che inducono il server a selezionare quale flusso inviare per primo.
 
-Using the PRIORITY frame, a client can also tell the server which other stream this stream depends on. It allows a client to build a priority “tree” where several “child streams” may depend on the completion of “parent streams”.
+Utilizzando il frame PRIORITY, un client può informare il server da quale altro flusso dipende il flusso attuale. Permette quindi al client di costruire un "albero delle priorità" dove più flussi "figli" posono dipendere dal completamento di un flusso "padre".
 
-The priority weights and dependencies can be changed dynamically at run-time, which should enable browsers to make sure that when users scroll down a page full of images, the browser can specify which images are most important, or if you switch tabs it can prioritize a new set of streams that suddenly come into focus.
+I pesi e le dipendenze possono essere cambiati dinamicamente, così per esempio un browser può decidere quale risorse caricare prima quando un utente scorre una pagina piena di immagini, o dare maggior priorità a nuovi flussi nel momento che l'utente decide di cambiare finestra di navigazione.
 
-## 6.5. Header compression
+## 6.5. Compressione dell'intestazione
 
-HTTP is a stateless protocol. In short, this means that every request needs to bring with it as much detail as the server needs to serve that request, without the server having to store a lot of info and meta-data from previous requests. Since http2 doesn't change this paradigm, it has to work the same way.
+HTTP è un protocolo senza stato (stateless). In breve, questo significa che ogni richiesta deve essere accompagnata quanti più dettagli possibili per permettere al server di completare la richiesta, senza dover ripetere troppe informazioni proveniente dai flussi precedenti. Poichè http2 non modifica questo paradigma, funzionerà nello stesso modo.
 
-This makes HTTP repetitive. When a client asks for many resources from the same server, like images from a web page, there will be a large series of requests that all look almost identical. A series of almost identical somethings begs for compression.
+Tutto questo però rende HTTP ripetitivo. Quando un client domanda troppe risorse dallo stesso server, come le immagini da una pagina web, vengono generate una serie di richieste simili tra di loro. Una serie di cose pressochè identiche demanda compressione.
 
-While the number of objects per web page has increased (as mentioned earlier), the use of cookies and the size of the requests have also kept growing over time. Cookies also need to be included in all requests, often the same ones in multiple requests.
+Mentre il numero di oggetti per pagina web è cresciuto (come già menzionato), anche l'utilizzo dei cookie è cresciuto e la grandezza delle richieste sono andati di pari passo. I cookie inoltre devono essere inclusi in ogni richiesta, e spesso in richieste differenti vengono inclusi gli stessi cookie.
 
-The HTTP 1.1 request sizes have actually gotten so large that they sometimes end up larger than the initial TCP window, which makes them very slow to send as they need a full round-trip to get an ACK back from the server before the full request has been sent. This is another argument for compression.
+Le richieste HTTP 1.1 sono diventate così larghe che a volte sono più grandi della finestra TCP (TCP window), il che rende la comunicazione assai lenta poichè hanno bisogno di un round-trip completo per ottenere un ACK dal server prima che la richiesta completa sia inviata. Questa è un'altra buona ragione per il tema compressione.
 
-### 6.5.1. Compression is a tricky subject
+### 6.5.1. La compressione è un argomento delicato
 
-HTTPS and SPDY compression were found to be vulnerable to the [BREACH](http://en.wikipedia.org/wiki/BREACH_%28security_exploit%29) and [CRIME](http://en.wikipedia.org/wiki/CRIME) attacks. By inserting known text into the stream and figuring out how that changes the output, an attacker can figure out what's being sent in an encrypted payload.
+HTTP e SPDY si sono rivelati vulnerabili agli attacchi [BREACH](http://en.wikipedia.org/wiki/BREACH_%28security_exploit%29) e [CRIME](http://en.wikipedia.org/wiki/CRIME). Inserendo un testo determinato nel flusso e notando come l'output cambi in base ad esso, un malintenzionato può capire cosa è stato inviato anche in informazioni criptate.
 
-Doing compression on dynamic content for a protocol - without becoming vulnerable to one of these attacks - requires some thought and careful consideration. This is what the HTTPbis team tried to do.
+Comprimere contenuti dinamici - senza diventare vulnerabili a uno di questi attacchi - richiede qualche considerazione in più. E questo è quello che il team HTTPbus ha provato a fare.
 
-Enter [HPACK](http://www.rfc-editor.org/rfc/rfc7541.txt), Header Compression for HTTP/2, which – as the name suggests - is a compression format especially crafted for http2 headers, and it is being specified in a separate internet draft. The new format, together with other counter-measures (such as a bit that asks intermediaries to not compress a specific header and optional padding of frames), should make it harder to exploit compression.
+Dentro [HPACK](http://www.rfc-editor.org/rfc/rfc7541.txt), è stata specificata la Header Compression per HTTP/2, che – come il nome suggerisci - è un formato di compressione pensato appositamente per le intestazioni http2 ed è stato specificato in una bozza separata. Il nuovo formato, assieme ad altre contromisure (come un bit che chiede agli intermediari di non comprimere specifiche intestazioni e il riempimento - padding in inglese - opzionale dei frame), renderà più difficile per i malintenzionati poter sfruttare la compressione a proprio vantaggio.
 
-In the words of Roberto Peon (one of the creators of HPACK):
+Con parole di Roberto Peon (uno dei creatori di HPACK):
 
-> “HPACK was designed to make it difficult for a conforming implementation to
-> leak information, to make encoding and decoding very fast/cheap, to provide
-> for receiver control over compression context size, to allow for proxy
-> re-indexing (i.e., shared state between frontend and backend within a proxy),
-> and for quick comparisons of Huffman-encoded strings”.
+> “HPACK è stato pensato per rendere difficile - in caso di implementazione conforme - la perdita di informazioni, velocizzare la codifica e decodifica, fornire al ricevente controllo sulla grandezza del contenuto della compressione, permettere proxy-reindexing (cioè uno stato condiviso tra la parte che si interfaccia con l'utente e quella interna nascosta dietro un proxy), e permettere una rapida comparazione di stringhe di testo codficicate con l'algoritmo di Huffman
 
-## 6.6. Reset - change your mind
+## 6.6. Reset - cambia la prospettiva
 
-One of the drawbacks with HTTP 1.1 is that when an HTTP message has been sent
-off with a Content-Length of a certain size, you can't easily just stop
-it. Sure, you can often (but not always) disconnect the TCP connection, but that
-comes at the cost of having to negotiate a new TCP handshake again.
+Uno degli incovenienti di HTTP 1.1 è non poter fermare facilmente un messaggio già iniziato a spedire con un determianto Content-Length. Sicuramente si può chiudere la connessione TCP, ma questo viene a costo di doverne instanziare una nuova.
 
-A better solution would be to just stop the message and start a new. This can be done with http2's RST_STREAM frame which will help prevent wasted bandwidth and the need to tear down connections.
+Una soluzione migliore potrebbe essere quella di fermare un messaggio e cominciarne uno nuovo. Questo può essere fatto con il frame RST_STREAM di http2 che aiuterà a prevenire sprechi di banda e la necessità di interrompere connessioni già avviate.
 
 ## 6.7. Server push
 
-This is the feature also known as “cache push”. The idea is that if the client asks for resource X, the server may know that the client will probably want resource Z as well, and sends it to the client without being asked. It helps the client by putting Z into its cache so that it will be there when it wants it.
+QUesta funzionalità è anche chiamata "cache push". L'idea è che se il client chiede la risorsa X, il server potrebbe già sapere che il client probabilmente avrà bisogno anche della risorsa Z, e fornirla al client prima della richiesta. Questo aiuterà il client a metterla in cache, pronta per usarla quando ne avrà bisogno.
 
-Server push is something a client must explicitly allow the server to do. Even then, the client can swiftly terminate a pushed stream at any time with RST_STREAM should it not want a particular resource.
+Server push è qualcosa che il client deve esplicitatamente permettere al server di fare. Anche a quel punto, il client può tranquillamente terminare uno stream forzato (pushed stream) in qualsiasi momento attraverso il frame RST_STREAM in caso non volesse una particolare risorsa.
 
-## 6.8. Flow Control
+## 6.8. Cotrollo del flusso
 
-Each individual http2 stream has its own advertised flow window that the other end is allowed to send data for. If you happen to know how SSH works, this is very similar in style and spirit.
+Ogni singolo flusso http2 ha le sue finestre di flusso (flow window) in cui all'altra estremità è permesso inviare dati. Se conosci SSH, questo concetto è molto simile in spirito e stile.
 
-For every stream, both ends have to tell the peer that it has enough room to handle incoming data, and the other end is only allowed to send that much data until the window is extended. Only DATA frames are flow controlled.
+Per ogni flusso, entrambi i partecipanti devono avvertire di avere abbastanza spazio per ricere i dati in arrivo, mentre all'altra estremità è consentito inviare tanti dati quanto è estesa questa finestra. Solo i frame DATA sono soggetti a questo controllo del flusso.
